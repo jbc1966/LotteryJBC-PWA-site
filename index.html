@@ -45,7 +45,7 @@
       button.disabled = true;
       error.textContent = "";
       try {
-        const response = await fetch("payload.json?version=978865a168fa", { cache: "no-store" });
+        const response = await fetch("payload.json?version=651a569709ba", { cache: "no-store" });
         if (!response.ok) throw new Error("No se pudo descargar la app cifrada.");
         const payload = await response.json();
         const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(accessKey), "PBKDF2", false, ["deriveKey"]);

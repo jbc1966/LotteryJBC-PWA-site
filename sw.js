@@ -1,4 +1,4 @@
-const CACHE_NAME = "lottery-jbc-locked-v1";
+const CACHE_NAME = "lottery-jbc-locked-v3";
 const APP_SHELL = [
   "./",
   "./payload.json",
