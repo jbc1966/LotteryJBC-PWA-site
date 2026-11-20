@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071b34">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lotería JBC">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Acceso privado · Lotería JBC</title>
+  <style>
+    :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;color:#f4f8fc;background:radial-gradient(circle at 80% 0,rgba(49,166,255,.28),transparent 30rem),#041326}
+    main{width:min(92%,420px);padding:28px;border:1px solid rgba(151,205,255,.18);border-radius:26px;background:rgba(13,39,68,.9);box-shadow:0 25px 70px rgba(0,0,0,.3)}
+    .lock{display:grid;width:58px;height:58px;margin-bottom:20px;place-items:center;border-radius:18px;background:linear-gradient(145deg,#45e1d1,#31a6ff);color:#06213a;font-size:28px}
+    h1{margin:0 0 9px;font-size:24px}p{margin:0 0 22px;color:#9bb0c7;font-size:14px;line-height:1.5}label{display:block;margin-bottom:8px;font-size:12px;font-weight:700}
+    input,button{width:100%;height:50px;border-radius:15px;font:inherit}input{padding:0 15px;color:#fff;border:1px solid rgba(151,205,255,.2);outline:0;background:#082441}
+    button{margin-top:12px;border:0;color:#041326;font-weight:800;background:linear-gradient(120deg,#45e1d1,#76caff)}button:disabled{opacity:.6}
+    #error{margin:14px 0 0;color:#ffadad;font-size:13px}#error:empty{display:none}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="lock" aria-hidden="true">◆</div>
+    <h1>Acceso privado</h1>
+    <p>Lotería JBC está cifrada. Introduce tu clave personal para abrirla en este dispositivo.</p>
+    <form id="unlockForm">
+      <label for="accessKey">Clave de acceso</label>
+      <input id="accessKey" type="password" autocomplete="current-password" required autofocus>
+      <button type="submit">Abrir app</button>
+    </form>
+    <p id="error" role="alert"></p>
+  </main>
+  <script>
+    const decode = (value) => Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+    const sha256 = async (value) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", value)))
+      .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    async function decrypt(event) {
+      event.preventDefault();
+      const button = event.currentTarget.querySelector("button");
+      const accessKey = document.querySelector("#accessKey").value;
+      const error = document.querySelector("#error");
+      button.disabled = true;
+      error.textContent = "";
+      try {
+        const response = await fetch("payload.json?version=978865a168fa", { cache: "no-store" });
+        if (!response.ok) throw new Error("No se pudo descargar la app cifrada.");
+        const payload = await response.json();
+        const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(accessKey), "PBKDF2", false, ["deriveKey"]);
+        const key = await crypto.subtle.deriveKey(
+          { name: "PBKDF2", hash: "SHA-256", salt: decode(payload.salt), iterations: payload.iterations },
+          keyMaterial,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["decrypt"],
+        );
+        const clear = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: decode(payload.iv) },
+          key,
+          decode(payload.content),
+        );
+        if (await sha256(clear) !== payload.digest) throw new Error("La app cifrada no supera la verificación.");
+        const html = new TextDecoder().decode(clear);
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (cause) {
+        error.textContent = "Clave incorrecta o app dañada. Vuelve a intentarlo.";
+        button.disabled = false;
+      }
+    }
+    document.querySelector("#unlockForm").addEventListener("submit", decrypt);
+    if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
+  </script>
+</body>
+</html>
